@@ -15,11 +15,52 @@ The following example attaches volume to a power systems virtual server instance
 
 ```terraform
 resource "ibm_pi_volume_attach" "testacc_volume_attach"{
-	pi_cloud_instance_id = "<value of the cloud_instance_id>"
-	pi_volume_id = "<id of the volume to attach>"
-	pi_instance_id = "<pvm instance id>"
+  pi_cloud_instance_id = "<value of the cloud_instance_id>"
+  pi_volume_id = "<id of the volume to attach>"
+  pi_instance_id = "<pvm instance id>"
 }
 ```
+Attaching shareable volume to mutiple instances
+```terraform
+resource "ibm_pi_volume" "testacc_volume"{
+  pi_volume_size       = 20
+  pi_volume_name       = "test-volume"
+  pi_volume_type       = "ssd"
+  pi_volume_shareable  = true
+  pi_cloud_instance_id = "<value of the cloud_instance_id>"
+}
+
+resource "ibm_pi_instance" "test-instance" {
+  count                 = 2
+  pi_memory             = "4"
+  pi_processors         = "2"
+  pi_instance_name      = "test-vm-${count.index}"
+  pi_proc_type          = "shared"
+  pi_image_id           = "${data.ibm_pi_image.powerimages.id}"
+  pi_key_pair_name      = ibm_pi_key.key.key_id
+  pi_sys_type           = "s922"
+  pi_cloud_instance_id  = "<value of the cloud_instance_id>"
+  pi_pin_policy         = "none"
+  pi_network {
+    network_id = data.ibm_pi_public_network.dsnetwork.id
+    }
+}
+
+resource "ibm_pi_volume_attach" "testacc_volume_attach_1"{
+  pi_cloud_instance_id    = "<value of the cloud_instance_id>"
+  pi_volume_id            = "${ibm_pi_volume.testacc_volume.volume_id}"
+  pi_instance_id          = "${ibm_pi_instance.test-instance[0].instance_id}"
+}
+
+resource "ibm_pi_volume_attach" "testacc_volume_attach_2"{
+  depends_on              = [ibm_pi_volume_attach.testacc_volume_attach_1]
+  pi_cloud_instance_id    = "<value of the cloud_instance_id>"
+  pi_volume_id            = "${ibm_pi_volume.testacc_volume.volume_id}"
+  pi_instance_id          = "${ibm_pi_instance.test-instance[1].instance_id}"
+}
+```
+
+It is recommended to use `depends_on` argument when attaching a single shareable volume to multiple pvm instances, this enforces the volume attachments to happen one at a time.
 
 **Note**
 * Please find [supported Regions](https://cloud.ibm.com/apidocs/power-cloud#endpoint) for endpoints.
